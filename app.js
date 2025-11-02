@@ -82,13 +82,16 @@ function player_init(data) {
   players[player.id] = player;
 
   console.log(
-    `Player #${player.id} placed finger at (${player.id}, ${player.id})\n`
+    `Player #${player.id} placed finger at (${player.x}, ${player.y})\n`
   );
 }
 function player_del(id) {
+  const player = players[id];
   document.body.removeChild(players[id].canvas);
   delete players[id];
-  console.log(`Player #${id} lifted finger\n`);
+  console.log(
+    `Player #${player.id} lifted finger from (${player.x}, ${player.y})\n`
+  );
 }
 
 canvas.addEventListener("touchstart", (e) => {
@@ -103,7 +106,8 @@ canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
 
   Array.from(e.changedTouches).forEach((touch) => {
-    player_update_pos(players[touch.identifier], touch);
+    if (touch.identifier in players)
+      player_update_pos(players[touch.identifier], touch);
   });
 });
 
