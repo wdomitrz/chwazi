@@ -9,7 +9,8 @@
     <title>Chwazi Finger Chooser</title>
     <style>
       body,
-      html {
+      html,
+      canvas {
         margin: 0;
         padding: 0;
         height: 100%;
@@ -18,15 +19,10 @@
         overflow: hidden;
         touch-action: none;
       }
-      canvas {
-        display: block;
-        position: absolute;
-        touch-action: none;
-      }
     </style>
   </head>
   <body>
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="main"></canvas>
     <script src="app.js"></script>
   </body>
 </html>

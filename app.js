@@ -1,125 +1,198 @@
-console.log("version 2");
-// Get the main canvas and set up the context
-const canvas = document.getElementById("gameCanvas");
+let players = new Map();
+let chosenPlayer;
 
-// Set the canvas size to match the window size
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const REQUIRED_PLAYER_COUNT = 1;
+const INNER_RADIUS = 36;
+const OUTER_RADIUS = 16;
+const OUTER_CIRCLE_WIDTH = 12;
+const MAX_PULSE_SCALE = 0.125;
+const DRAWING_TIME_MS = 2000;
+const CHOSEN_PLAYER_ANIMATION_TIME_MS = 1000;
+const SCALING_PERIOD_MS = 1500;
+const CHOSEN_SEPARATION = 8;
+const RESTART_DELAY = 2000;
+const MIN_WINNER_RADIUS =
+  (INNER_RADIUS + OUTER_RADIUS + OUTER_CIRCLE_WIDTH / 2 + CHOSEN_SEPARATION) *
+  (1 + MAX_PULSE_SCALE);
 
-// Set the radius of the inner circle
-const innerRadius = 36;
-const outerRadius = 16;
-const outerCircleWidth = 12;
+const _animation = (function () {
+  const [canvas, ctx] = (function () {
+    const canvas = document.getElementById("main");
+    const ctx = canvas.getContext("2d");
 
-// Initialize player data and debug info
-let players = {};
+    const resize = () => {
+      canvas.width = Math.floor(window.innerWidth);
+      canvas.height = Math.floor(window.innerHeight);
+    };
+    window.addEventListener("resize", resize);
+    resize();
 
-// Helper function to create a circle on a new canvas
-function createCircleCanvas(color) {
-  // Create a new canvas for each touch
-  const circleCanvas = document.createElement("canvas");
-  circleCanvas.width = innerRadius * 2 + outerRadius * 2 + outerCircleWidth * 2;
-  circleCanvas.height =
-    innerRadius * 2 + outerRadius * 2 + outerCircleWidth * 2;
-  const circleCtx = circleCanvas.getContext("2d");
+    return [canvas, ctx];
+  })();
 
-  // Draw the inner circle (solid color)
-  circleCtx.beginPath();
-  circleCtx.arc(
-    circleCanvas.width / 2,
-    circleCanvas.height / 2,
-    innerRadius,
-    0,
-    Math.PI * 2
-  );
-  circleCtx.fillStyle = color;
-  circleCtx.fill();
+  let start;
 
-  // Draw the outer circle (halo)
-  circleCtx.beginPath();
-  circleCtx.arc(
-    circleCanvas.width / 2,
-    circleCanvas.height / 2,
-    innerRadius + outerRadius,
-    0,
-    Math.PI * 2
-  );
-  circleCtx.lineWidth = outerCircleWidth;
-  circleCtx.strokeStyle = color;
-  circleCtx.stroke();
+  function animationFrame(timestamp) {
+    if (start === undefined) start = timestamp;
+    const scalePeriod =
+      ((timestamp - start) % SCALING_PERIOD_MS) / SCALING_PERIOD_MS;
+    const scale = 1 + MAX_PULSE_SCALE * Math.sin(scalePeriod * 2 * Math.PI);
 
-  return circleCanvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (chosenPlayer !== undefined) {
+      chosenPlayer.drawPlayerCircle(ctx, scale);
+      const winnerScale = Math.min(
+        (timestamp - chosenPlayer.getChosenTime(timestamp)) /
+          CHOSEN_PLAYER_ANIMATION_TIME_MS,
+        1.0
+      );
+      chosenPlayer.drawWinnerCircle(
+        ctx,
+        winnerScale,
+        canvas.width,
+        canvas.height
+      );
+    } else {
+      players.values().forEach((player) => player.drawPlayerCircle(ctx, scale));
+    }
+
+    requestAnimationFrame(animationFrame);
+  }
+
+  requestAnimationFrame(animationFrame);
+})();
+
+const startTimer = (function () {
+  let timeout;
+
+  function _startTimer() {
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      timeout = undefined;
+    }
+
+    if (players.size < REQUIRED_PLAYER_COUNT) return;
+    if (chosenPlayer !== undefined) return;
+    timeout = window.setTimeout(Player.drawPlayer, DRAWING_TIME_MS);
+  }
+
+  return _startTimer;
+})();
+
+class Player {
+  _get_color() {
+    return `hsl(${Math.random() * 360}, 100%, 50%)`;
+  }
+  constructor(id, x, y) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.color = this._get_color();
+    this.isChosen = false;
+    this.chosenTime = undefined;
+    console.log(`Player #${this.id} placed finger at (${this.x}, ${this.y})\n`);
+  }
+
+  update_pos(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  del() {
+    players.delete(this.id);
+
+    console.log(
+      `Player #${this.id} lifted finger from (${this.x}, ${this.y})\n`
+    );
+  }
+
+  drawPlayerCircle(ctx, scale) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, INNER_RADIUS * scale, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(
+      this.x,
+      this.y,
+      (INNER_RADIUS + OUTER_RADIUS) * scale,
+      0,
+      Math.PI * 2
+    );
+    ctx.lineWidth = OUTER_CIRCLE_WIDTH * scale;
+    ctx.strokeStyle = this.color;
+    ctx.stroke();
+  }
+
+  drawWinnerCircle(ctx, animation_completion_part, fullWidth, fullHeight) {
+    const winnerRadius =
+      animation_completion_part * MIN_WINNER_RADIUS +
+      (1 - animation_completion_part) *
+        Math.max(fullHeight, fullHeight, MIN_WINNER_RADIUS);
+
+    ctx.beginPath();
+    ctx.fillStyle = this.color;
+    ctx.rect(0, 0, fullWidth, fullHeight);
+    ctx.arc(this.x, this.y, winnerRadius, 0, Math.PI * 2);
+    ctx.fill("evenodd");
+  }
+
+  getChosenTime(timestamp) {
+    if (!this.isChosen) return;
+    if (this.chosenTime === undefined) this.chosenTime = timestamp;
+    return this.chosenTime;
+  }
+
+  static drawPlayer() {
+    if (players.size < REQUIRED_PLAYER_COUNT) return;
+    if (chosenPlayer !== undefined) return;
+    chosenPlayer = Array.from(players.values())[
+      Math.floor(Math.random() * players.size)
+    ];
+    chosenPlayer.isChosen = true;
+    players.clear();
+    players.set(chosenPlayer.id, chosenPlayer);
+  }
+
+  static newPlayer(data) {
+    players.set(
+      data.pointerId,
+      new Player(data.pointerId, data.clientX, data.clientY)
+    );
+    startTimer();
+  }
+  static playerUpdatePos(data) {
+    const player = players.get(data.pointerId);
+    if (player === undefined) return;
+    player.update_pos(data.clientX, data.clientY);
+  }
+  static playerDel(data) {
+    const player = players.get(data.pointerId);
+    if (player === undefined) return;
+
+    if (player.isChosen) {
+      window.setTimeout(() => {
+        console.log("zxcv");
+        chosenPlayer = undefined;
+      }, RESTART_DELAY);
+      console.log("asdf");
+    }
+
+    player.del();
+    players.clear();
+    startTimer();
+  }
 }
-function player_get_canvas_x_y(self) {
-  const offset = innerRadius + outerRadius + outerCircleWidth;
-  return [self.x - offset, self.y - offset];
-}
-function playser_set_canvas_pos(self) {
-  const [x, y] = player_get_canvas_x_y(self);
-  self.canvas.style.position = "absolute";
-  self.canvas.style.left = `${x}px`;
-  self.canvas.style.top = `${y}px`;
-}
-function player_update_pos(self, update) {
-  self.x = update.clientX;
-  self.y = update.clientY;
-  playser_set_canvas_pos(self);
-}
 
-function player_init(data) {
-  const color = `hsl(${Math.random() * 360}, 100%, 50%)`;
-  const player = {
-    id: data.identifier,
-    x: data.clientX,
-    y: data.clientY,
-    color: color,
-    canvas: createCircleCanvas(color),
-  };
+document.addEventListener("pointerdown", Player.newPlayer);
+document.addEventListener("pointermove", Player.playerUpdatePos);
+document.addEventListener("pointercancel", Player.playerDel);
+document.addEventListener("pointerup", Player.playerDel);
 
-  playser_set_canvas_pos(player);
-  document.body.appendChild(player.canvas);
-
-  players[player.id] = player;
-
-  console.log(
-    `Player #${player.id} placed finger at (${player.x}, ${player.y})\n`
-  );
-}
-function player_del(id) {
-  const player = players[id];
-  document.body.removeChild(players[id].canvas);
-  delete players[id];
-  console.log(
-    `Player #${player.id} lifted finger from (${player.x}, ${player.y})\n`
-  );
-}
-
-canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault();
-
-  Array.from(e.changedTouches).forEach((touch) => {
-    player_init(touch);
-  });
+document.addEventListener("touchmove", (e) => e.preventDefault(), {
+  passive: false,
 });
 
-canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-
-  Array.from(e.changedTouches).forEach((touch) => {
-    if (touch.identifier in players)
-      player_update_pos(players[touch.identifier], touch);
-  });
-});
-
-canvas.addEventListener("touchend", (e) => {
-  e.preventDefault();
-
-  Array.from(e.changedTouches).forEach((touch) => {
-    player_del(touch.identifier);
-  });
-});
-
-window.addEventListener("resize", () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-});
+// if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
