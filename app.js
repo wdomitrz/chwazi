@@ -1,7 +1,9 @@
 let players = new Map();
 let chosenPlayer;
+let started_timeout = false;
+let timeout_start_time = undefined;
 
-const REQUIRED_PLAYER_COUNT = 1;
+const REQUIRED_PLAYER_COUNT = 2;
 const INNER_RADIUS = 36;
 const OUTER_RADIUS = 16;
 const OUTER_CIRCLE_WIDTH = 12;
@@ -30,31 +32,52 @@ const _animation = (function () {
     return [canvas, ctx];
   })();
 
-  let start;
+  let start_time = undefined;
 
   function animationFrame(timestamp) {
-    if (start === undefined) start = timestamp;
-    const scalePeriod =
-      ((timestamp - start) % SCALING_PERIOD_MS) / SCALING_PERIOD_MS;
-    const scale = 1 + MAX_PULSE_SCALE * Math.sin(scalePeriod * 2 * Math.PI);
+    if (start_time === undefined) start_time = timestamp;
+    if (started_timeout && timeout_start_time === undefined)
+      timeout_start_time = timestamp;
+    const pulseScale =
+      1 +
+      MAX_PULSE_SCALE *
+        Math.sin(
+          (((timestamp - start_time) % SCALING_PERIOD_MS) / SCALING_PERIOD_MS) *
+            2 *
+            Math.PI
+        );
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (chosenPlayer !== undefined) {
-      chosenPlayer.drawPlayerCircle(ctx, scale);
       const winnerScale = Math.min(
         (timestamp - chosenPlayer.getChosenTime(timestamp)) /
           CHOSEN_PLAYER_ANIMATION_TIME_MS,
         1.0
       );
+
       chosenPlayer.drawWinnerCircle(
         ctx,
         winnerScale,
         canvas.width,
         canvas.height
       );
+      chosenPlayer.drawPlayerCircle(ctx, pulseScale, 1.0);
     } else {
-      players.values().forEach((player) => player.drawPlayerCircle(ctx, scale));
+      const loadingScale =
+        timeout_start_time === undefined
+          ? 0.0
+          : Math.min(
+              1 -
+                (DRAWING_TIME_MS - (timestamp - timeout_start_time)) /
+                  DRAWING_TIME_MS,
+              1.0
+            );
+      players
+        .values()
+        .forEach((player) =>
+          player.drawPlayerCircle(ctx, pulseScale, loadingScale)
+        );
     }
 
     requestAnimationFrame(animationFrame);
@@ -66,18 +89,28 @@ const _animation = (function () {
 const startTimer = (function () {
   let timeout;
 
-  function _startTimer() {
+  function clearTimer() {
     if (timeout !== undefined) {
       window.clearTimeout(timeout);
       timeout = undefined;
+      started_timeout = false;
+      timeout_start_time = undefined;
     }
+  }
 
-    if (players.size < REQUIRED_PLAYER_COUNT) return;
-    if (chosenPlayer !== undefined) return;
+  function startTimer() {
+    started_timeout = true;
     timeout = window.setTimeout(Player.drawPlayer, DRAWING_TIME_MS);
   }
 
-  return _startTimer;
+  function restartAndStartTimer() {
+    clearTimer();
+    if (players.size < REQUIRED_PLAYER_COUNT) return;
+    if (chosenPlayer !== undefined) return;
+    startTimer();
+  }
+
+  return restartAndStartTimer;
 })();
 
 class Player {
@@ -91,7 +124,6 @@ class Player {
     this.color = this._get_color();
     this.isChosen = false;
     this.chosenTime = undefined;
-    console.log(`Player #${this.id} placed finger at (${this.x}, ${this.y})\n`);
   }
 
   update_pos(x, y) {
@@ -101,15 +133,11 @@ class Player {
 
   del() {
     players.delete(this.id);
-
-    console.log(
-      `Player #${this.id} lifted finger from (${this.x}, ${this.y})\n`
-    );
   }
 
-  drawPlayerCircle(ctx, scale) {
+  drawPlayerCircle(ctx, pulseScale, loadingScale) {
     ctx.beginPath();
-    ctx.arc(this.x, this.y, INNER_RADIUS * scale, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, INNER_RADIUS * pulseScale, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
 
@@ -117,12 +145,24 @@ class Player {
     ctx.arc(
       this.x,
       this.y,
-      (INNER_RADIUS + OUTER_RADIUS) * scale,
+      (INNER_RADIUS + OUTER_RADIUS) * pulseScale,
       0,
       Math.PI * 2
     );
-    ctx.lineWidth = OUTER_CIRCLE_WIDTH * scale;
+    ctx.lineWidth = OUTER_CIRCLE_WIDTH * pulseScale;
     ctx.strokeStyle = this.color;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(
+      this.x,
+      this.y,
+      (INNER_RADIUS + OUTER_RADIUS) * pulseScale,
+      (Math.PI * 2 * (1 - loadingScale)) / 2,
+      (Math.PI * 2 * (1 - loadingScale) * 3) / 2
+    );
+    ctx.lineWidth = OUTER_CIRCLE_WIDTH * pulseScale;
+    ctx.strokeStyle = `rgba(255, 255, 255, 0.34)`;
     ctx.stroke();
   }
 
@@ -174,10 +214,8 @@ class Player {
 
     if (player.isChosen) {
       window.setTimeout(() => {
-        console.log("zxcv");
         chosenPlayer = undefined;
       }, RESTART_DELAY);
-      console.log("asdf");
     }
 
     player.del();
