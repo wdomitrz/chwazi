@@ -1,4 +1,4 @@
-const CACHE = "chwazi-cache-v5";
+const CACHE = "chwazi-cache-v6";
 const FILES = [
   "./",
   "./app.js",
