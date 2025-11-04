@@ -115,7 +115,7 @@ const startTimer = (function () {
 
 class Player {
   static get_color(id) {
-    return `hsl(${id * 223 + 341}, 100%, 40%)`;
+    return `hsl(${id * 223 + 263}, 100%, 40%)`;
   }
   constructor(id, x, y) {
     this.id = id;
