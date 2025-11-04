@@ -17,13 +17,3 @@ self.addEventListener("fetch", (event) => {
     caches.match(event.request).then((res) => res || fetch(event.request))
   );
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      cacheNames.map((cacheName) => {
-        if (cacheName !== CACHE) return caches.deletwaitUntile(cacheName);
-      })
-    )
-  );
-});
