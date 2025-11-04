@@ -8,7 +8,7 @@ const INNER_RADIUS = 36;
 const OUTER_RADIUS = 16;
 const OUTER_CIRCLE_WIDTH = 12;
 const MAX_PULSE_SCALE = 0.125;
-const DRAWING_TIME_MS = 2000;
+const DRAWING_TIME_MS = 2500;
 const CHOSEN_PLAYER_ANIMATION_TIME_MS = 1000;
 const SCALING_PERIOD_MS = 1500;
 const CHOSEN_SEPARATION = 8;
@@ -114,14 +114,14 @@ const startTimer = (function () {
 })();
 
 class Player {
-  _get_color() {
-    return `hsl(${Math.random() * 360}, 100%, 50%)`;
+  static get_color(id) {
+    return `hsl(${id * 223 + 341}, 100%, 40%)`;
   }
   constructor(id, x, y) {
     this.id = id;
     this.x = x;
     this.y = y;
-    this.color = this._get_color();
+    this.color = Player.get_color(id);
     this.isChosen = false;
     this.chosenTime = undefined;
   }
@@ -197,11 +197,13 @@ class Player {
   }
 
   static newPlayer(data) {
-    players.set(
-      data.pointerId,
-      new Player(data.pointerId, data.clientX, data.clientY)
-    );
-    startTimer();
+    if (chosenPlayer === undefined) {
+      players.set(
+        data.pointerId,
+        new Player(data.pointerId, data.clientX, data.clientY)
+      );
+      startTimer();
+    }
   }
   static playerUpdatePos(data) {
     const player = players.get(data.pointerId);
@@ -216,11 +218,11 @@ class Player {
       window.setTimeout(() => {
         chosenPlayer = undefined;
       }, RESTART_DELAY);
+      players.clear();
+    } else {
+      player.del();
+      startTimer();
     }
-
-    player.del();
-    players.clear();
-    startTimer();
   }
 }
 
@@ -233,4 +235,4 @@ document.addEventListener("touchmove", (e) => e.preventDefault(), {
   passive: false,
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+// if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
