@@ -944,27 +944,34 @@ fn dist_is_ignored() {
     assert!(ignored, "dist/ must be in .gitignore");
 }
 
-/// The committed icon is the author's original, and this pins it. A rewrite that
-/// redrew it would be a redesign, and the PNGs derived from a redrawn SVG would
-/// carry the redrawing into every install icon silently — the difference is only
-/// ever visible on a home screen.
+/// The committed icon is the Chwazi brand mark, and this pins its essentials. A
+/// regression to some other drawing would be a redesign nobody asked for, and
+/// the PNGs derived from the SVG would carry it into every install icon
+/// silently — the difference is only ever visible on a home screen.
 #[test]
-fn the_committed_icon_is_the_authors_original() {
-    let icon = std::fs::read(root().join("assets/icon.svg")).expect("assets/icon.svg");
+fn the_committed_icon_is_the_chwazi_brand_mark() {
+    let icon = std::fs::read_to_string(root().join("assets/icon.svg")).expect("assets/icon.svg");
+    // The mark: a black tile with a 2x2 grid of four flat dots, the chosen one
+    // yellow and the other three blue, in the user-chosen colours.
+    assert!(
+        icon.contains("viewBox=\"0 0 512 512\""),
+        "the icon is a 512-unit tile"
+    );
+    assert!(
+        icon.contains("fill=\"#000000\""),
+        "the tile is black, edge to edge, like the app"
+    );
     assert_eq!(
-        icon.len(),
-        1144,
-        "assets/icon.svg must be the original, byte for byte"
+        icon.matches("fill=\"#ffea00\"").count(),
+        1,
+        "exactly one yellow dot: the chosen one"
     );
-    let icon = String::from_utf8(icon).expect("the icon is text");
-    assert!(
-        icon.contains("touch_long"),
-        "the original icon is Material Symbols \"touch_long\""
+    assert_eq!(
+        icon.matches("fill=\"#00a2ff\"").count(),
+        3,
+        "three azure blue dots: the not-chosen ones"
     );
-    assert!(
-        icon.contains("fill: #434343"),
-        "and it is the original's #434343, on transparent"
-    );
+    assert_eq!(icon.matches("<circle").count(), 4, "four flat dots, nothing else");
     // It is published, not just committed: the shell links it and the worker
     // precaches it, so `build.rs` has to copy it.
     assert!(
