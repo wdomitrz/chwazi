@@ -868,7 +868,10 @@ fn the_manifest_keeps_the_originals_name_and_fullscreen_display() {
     let build = std::fs::read_to_string(root().join("build.rs")).expect("build.rs");
     for (constant, expected) in [
         ("const NAME: &str = ", "\"Chwazi Finger Chooser\""),
-        ("const SHORT_NAME: &str = ", "\"Chwazi\""),
+        // One name: the launcher label is the app's name, not a word that drops
+        // the half saying what it does. The original manifest's "Chwazi" named
+        // nothing on a home screen full of icons.
+        ("const SHORT_NAME: &str = ", "\"Chwazi Finger Chooser\""),
         ("const DISPLAY: &str = ", "\"fullscreen\""),
     ] {
         let line = build
@@ -1469,5 +1472,15 @@ fn the_pages_workflow_builds_the_wasm_before_the_shell() {
         live.contains("target/wasm32-unknown-unknown/release/chwazi.wasm"),
         "the bindings step must read chwazi.wasm; a different crate name here builds a \
          different app and still exits zero",
+    );
+}
+
+/// One name: the launcher label is the app's own name.
+#[test]
+fn the_launcher_label_is_the_apps_name() {
+    let build = std::fs::read_to_string(root().join("build.rs")).expect("the build script");
+    assert!(
+        build.contains("const SHORT_NAME: &str = \"Chwazi Finger Chooser\";"),
+        "short_name must be the app's name, not a word that drops what it does"
     );
 }

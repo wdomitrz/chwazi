@@ -53,7 +53,9 @@ const ICON_SIZES: [u32; 2] = [192, 512];
 /// because the app is black from edge to edge and a black splash is the only
 /// colour that does not flash white between the launcher and the first frame.
 const NAME: &str = "Chwazi Finger Chooser";
-const SHORT_NAME: &str = "Chwazi";
+/// One name, both fields: an installed app's label is its name, and a shorter
+/// one that drops the part saying what it does ("Chwazi") names nothing.
+const SHORT_NAME: &str = "Chwazi Finger Chooser";
 /// `fullscreen`, as the original chose: this is a phone passed round a table,
 /// and the point is that nothing but the fingers is on the glass.
 const DISPLAY: &str = "fullscreen";
